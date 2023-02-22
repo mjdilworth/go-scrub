@@ -1,6 +1,6 @@
-BINARY_NAME=go-srub
-DOCKER_REGISTRY?= #if set it should finished by /
-EXPORT_RESULT?=false # for CI please set EXPORT_RESULT to true
+BINARY_NAME := go-scrub
+DOCKER_REGISTRY := #if set it should finished by /
+EXPORT_RESULT := false # for CI please set EXPORT_RESULT to true
 
 GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
@@ -30,21 +30,21 @@ build_and_run: ## build and run
 	build run
 
 ## clean:
-clean: ## clean the project	
+clean: ## clean the project	add "-" before command so if error it is ignored
 	go	clean
-	rm	${BINARY_NAME}
-	rm	${BINARY_NAME}-darwin
-	rm	${BINARY_NAME}-linux
-	rm	${BINARY_NAME}-windows
+	-rm	${BINARY_NAME}
+	-rm	${BINARY_NAME}-darwin
+	-rm	${BINARY_NAME}-linux	
+	-rm	${BINARY_NAME}-windows
 
 ## test:
 test: ## run tests
 	go test ./...
-	ifeq ($(EXPORT_RESULT), true)
-		## GO111MODULE=off go get -u github.com/jstemmer/go-junit-report
-		## $(eval OUTPUT_OPTIONS = | tee /dev/tty | go-junit-report -set-exit-code > junit-report.xml)
-	endif
-		go test -v -race ./... $(OUTPUT_OPTIONS)
+ifeq ($(EXPORT_RESULT),true)
+	## GO111MODULE=off go get -u github.com/jstemmer/go-junit-report
+	## $(eval OUTPUT_OPTIONS = | tee /dev/tty | go-junit-report -set-exit-code > junit-report.xml)		echo "no report"
+endif
+	go test -v -race ./... $(OUTPUT_OPTIONS)
 
 ## Docker:
 docker-build: ## Use the dockerfile to build the container

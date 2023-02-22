@@ -8,17 +8,44 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/mjdilworth/go-scrub/httpreq"
 )
 
-var logging bool = false
+// Req is the request query struct.
+// 5105 1051 0510 5100 example master debit card format
+// curl 'http://localhost:8080?timestamp=1437743020&limit=10&card=5105%201051%200510%205100&fields=foo,bar,badger'
+type Req struct {
+	Fields    []string
+	Limit     int
+	Card      string
+	Timestamp time.Time
+}
 
-// a channel to tell it to stop
-var stoplogchan = make(chan struct{})
+func Scrub(w http.ResponseWriter, r *http.Request) {
+	//what is the query string i need to scrub
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-// a channel to signal that it's stopped
-var stoppedlogchan = make(chan struct{})
+	data := &Req{}
+	if err := httpreq.NewParsingMap().
+		Add("limit", httpreq.ToInt, &data.Limit).
+		Add("card", httpreq.ToString, &data.Card).
+		Add("fields", httpreq.ToCommaList, &data.Fields).
+		Add("timestamp", httpreq.ToTSTime, &data.Timestamp).
+		Parse(r.Form); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	
+	_ = json.NewEncoder(w).Encode(data)
+
+}
+
 
 // placeholder
 func verifyUserPass(user string, pass string) bool {
@@ -37,6 +64,7 @@ func verifyUserPass(user string, pass string) bool {
 		return false
 	}
 }
+
 
 func Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
@@ -73,98 +101,10 @@ func Auth(w http.ResponseWriter, req *http.Request) {
 // Used for matching variables in a request URL.
 //var reResVars = regexp.MustCompile(`\\\{[^{}]+\\\}`)
 
-// Log handler to sopt and start
-func LogOrig(w http.ResponseWriter, r *http.Request) {
-
-	//this retrives the last elementin URI
-	request := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
-	//request := r.URL.Path
-
-	if request == "start" {
-		if logging {
-			return
-		}
-
-		//start the logging go routine
-		logging = true
-		go func() { // work in background
-			// close the stoppedchan when this func
-			// exits
-			defer close(stoppedlogchan)
-			//defer stoppedlogchan = make(chan struct{})
-			// TODO: do setup work
-			defer func() {
-				// TODO: do teardown work
-				fmt.Println("Graceful handler exit using stoplogchan")
-			}()
-			for {
-				select {
-				// TODO: do a bit of the work
-				case <-time.After(1 * time.Second):
-					fmt.Println("log something")
-				case <-stoplogchan:
-					fmt.Println("stopping")
-					// stop
-					return
-				}
-			}
-		}()
-
-	} else if request == "stop" {
-		if !logging {
-			return
-		}
-		//stop the logging go routine
-		log.Println("stopping...")
-		close(stoplogchan) // tell it to stop
-		<-stoppedlogchan   // wait for it to have stopped
-		logging = false
-		//recrreact channels
-		stoplogchan = make(chan struct{})
-		log.Println("Stopped.")
-
-	} else {
-		//do nothing
-		fmt.Println("unknown request")
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
 func TimeHandler(format string) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		tm := time.Now().Format(format)
 		w.Write([]byte("The time is: " + tm))
-	}
-	return http.HandlerFunc(fn)
-}
-
-func LogHandler(command chan<- string) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		//this retrives the last elementin URI
-		request := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
-		switch request {
-		case "play":
-			command <- "play"
-			log.Println("Playing logs")
-		case "pause":
-			command <- "pause"
-			log.Println("Pausing logs")
-		case "stop":
-			command <- "stop"
-			log.Println("Stopping")
-		case "info":
-			command <- "info"
-			log.Println("Setting to INFO")
-		case "warn":
-			command <- "warn"
-			log.Println("Setting to WARN")
-		case "error":
-			command <- "error"
-			log.Println("Setting to ERROR")
-		default:
-			log.Printf("Unkown command %s : send help for ... help", request)
-		}
 	}
 	return http.HandlerFunc(fn)
 }
@@ -177,7 +117,7 @@ type people struct {
 	Person []person `json:"people"`
 }
 
-//This functions goes off to the net to find peopel currenlty in sapce - i can inject delay in this
+// This functions goes off to the net to find peopel currenlty in sapce - i can inject delay in this
 func Spacepeeps(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	//w.Write([]byte(`{"message": "I am healthy"}`))
@@ -191,10 +131,9 @@ func Spacepeeps(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("AtTheEnd1", "Mikes value 1")
 	io.WriteString(w, "This HTTP response has both headers before this text and trailers at the end.\n")
-	
+
 	w.Header().Set("AtTheEnd2", "Mikes value 2")
 
-	
 	sout := fmt.Sprintf("%d people found in space.\n", people.Number)
 	io.WriteString(w, sout)
 	for _, p := range people.Person {

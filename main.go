@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 )
 
 // set up my log levels
@@ -37,13 +36,8 @@ func main() {
 
 	flag.Parse()
 
-	//start log goroutine
-	command := make(chan string)
-	go logging(command)
-	command <- "Pause"
-
 	//server *http.Server
-	server, err := NewServer(*serverPort, command)
+	server, err := NewServer(*serverPort)
 	if err != nil {
 		panic(err)
 	}
@@ -57,49 +51,3 @@ func main() {
 	fmt.Println("ended")
 
 }
-
-func logging(command <-chan string) {
-	var status = "Play"
-	var logLevel = "info"
-	count := 0
-	for {
-		select {
-		case cmd := <-command:
-			fmt.Println(cmd)
-			switch cmd {
-			case "stop":
-				return
-			case "pause":
-				status = "pause"
-			case "info":
-				logLevel = "info"
-			case "warn":
-				logLevel = "warn"
-			case "error":
-				logLevel = "error"
-			default:
-				status = "play"
-			}
-		case <-time.After(1 * time.Second):
-			if status == "play" {
-				logwork(count, logLevel)
-				count = count + 1
-			}
-		}
-	}
-}
-
-func logwork(i int, llevel string) {
-	//time.Sleep(250 * time.Millisecond)
-	switch llevel {
-	case "info":
-		InfoLogger.Printf("log something %d", i)
-	case "warn":
-		WarningLogger.Printf("log something %d", i)
-	case "error":
-		ErrorLogger.Printf("log something %d", i)
-	default:
-		InfoLogger.Printf("log something %d", i)
-	}
-}
-

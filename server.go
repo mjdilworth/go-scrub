@@ -16,9 +16,9 @@ type Server struct {
 }
 
 // NewServer creates and configures a server serving all application routes.
-func NewServer(listenAddr string, commandChan chan<- string) (*Server, error) {
+func NewServer(listenAddr string) (*Server, error) {
 
-	api := newAPI(commandChan)
+	api := newAPI()
 
 	srv := &http.Server{
 		Addr:    listenAddr,
@@ -34,21 +34,20 @@ func NewServer(listenAddr string, commandChan chan<- string) (*Server, error) {
 }
 
 // Routing
-func newAPI(commandChan chan<- string) *http.ServeMux {
+func newAPI() *http.ServeMux {
 
 	mux := http.NewServeMux()
 
 	//example to pass a variable to the handler. in this case a time format string
-	th := handlers.TimeHandler(time.RFC1123)
+	th := TimeHandler(time.RFC1123)
 	mux.Handle("/time", th)
 
-	mux.HandleFunc("/health/", handlers.Health)
-	mux.HandleFunc("/", handlers.Root)
-	mux.HandleFunc("/secret/", handlers.Auth)
-	mux.HandleFunc("/spacepeeps/", handlers.Spacepeeps)
-	lh := handlers.LogHandler(commandChan)
-	mux.Handle("/log/", lh)
-	mux.HandleFunc("/log/help", handlers.Help)
+	mux.HandleFunc("/health/", Health)
+	mux.HandleFunc("/", Root)
+	mux.HandleFunc("/secret/", Auth)
+	mux.HandleFunc("/spacepeeps/", Spacepeeps)
+	mux.HandleFunc("/help", Help)
+	mux.HandleFunc("/scrub",Scrub)
 
 	return mux
 }
